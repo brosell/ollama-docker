@@ -52,6 +52,7 @@ services:
       - ollama-docker
 
   ollama-webui:
+    profiles: [ui]
     image: ghcr.io/open-webui/open-webui:main
     container_name: ollama-webui
     # pull_policy: always
