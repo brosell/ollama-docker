@@ -1,15 +1,15 @@
 # Usage:
-#   GPU only:   docker compose --profile gpu up -d
-#   CPU only:   docker compose --profile cpu up -d
-#   Both:       docker compose --profile gpu --profile cpu up -d
-#   UI only:    docker compose up -d
+#   GPU only:   podman-compose --profile gpu up -d
+#   CPU only:   podman-compose --profile cpu up -d
+#   Both:       podman-compose --profile gpu --profile cpu up -d
+#   UI only:    podman-compose up -d
 #
 # Tear down (keeps volumes):
-#   docker compose --profile gpu --profile cpu down
+#   podman-compose --profile gpu --profile cpu down
 #
 # Pull a model into a specific backend:
-#   docker exec ollama-gpu ollama pull deepseek-r1:7b
-#   docker exec ollama-cpu ollama pull codellama:7b
+#   podman exec ollama-gpu ollama pull deepseek-r1:7b
+#   podman exec ollama-cpu ollama pull codellama:7b
 
 services:
 
@@ -28,15 +28,10 @@ services:
       - OLLAMA_KEEP_ALIVE=24h
       - OLLAMA_ORIGINS=*
       - OLLAMA_CONTEXT_LENGTH=32000
+    devices:
+      - nvidia.com/gpu=all
     networks:
       - ollama-docker
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu]
 
   ollama-cpu:
     profiles: [cpu]
@@ -65,15 +60,15 @@ services:
     ports:
       - 8080:8080
     environment: # https://docs.openwebui.com/getting-started/env-configuration#default_models
-      - OLLAMA_BASE_URLS=http://host.docker.internal:11434;http://host.docker.internal:11435
+      - OLLAMA_BASE_URLS=http://host.containers.internal:11434;http://host.containers.internal:11435
       - ENV=dev
       - WEBUI_AUTH=False
       - WEBUI_NAME=valiantlynx AI
       - WEBUI_URL=http://localhost:8080
       - WEBUI_SECRET_KEY=t0p-s3cr3t
-      - NO_PROXY=host.docker.internal
+      - NO_PROXY=host.containers.internal
     extra_hosts:
-      - host.docker.internal:host-gateway
+      - host.containers.internal:host-gateway
     restart: unless-stopped
     networks:
       - ollama-docker

@@ -1,20 +1,46 @@
 [![Open in Coder](https://coder.valiantlynx.com/open-in-coder.svg)](https://coder.valiantlynx.com/templates/docker/workspace?param.git_repo=git@github.com:mythrantic/ollama-docker.git)
 
-# Ollama Docker Compose Setup
+# Ollama Podman Compose Setup
 
-Welcome to the Ollama Docker Compose Setup! This project simplifies the deployment of Ollama using Docker Compose, making it easy to run Ollama with all its dependencies in a containerized environment.
+Welcome to the Ollama Podman Compose Setup! This project simplifies the deployment of Ollama using Podman Compose, making it easy to run Ollama with all its dependencies in a containerized environment.
 [![Star History Chart](https://api.star-history.com/svg?repos=valiantlynx/ollama-docker&type=Date)](https://star-history.com/#valiantlynx/ollama-docker&Date)
 
 ## Getting Started
 
 ### Prerequisites
+
 Make sure you have the following prerequisites installed on your machine:
 
-- Docker (should also be able to run docker compose ...)
+- Podman v4+ and podman-compose
 
-#### GPU Support (Optional)
+#### Installing Podman (Ubuntu 22.04)
 
-If you have a GPU and want to leverage its power within a Docker container, follow these steps to install the NVIDIA Container Toolkit:
+Ubuntu 22.04's default repos only ship Podman 3.x. Add the Kubic repo to get a modern version:
+
+```bash
+. /etc/os-release
+echo "deb https://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/unstable/xUbuntu_${VERSION_ID}/ /" \
+  | sudo tee /etc/apt/sources.list.d/devel:kubic:libcontainers:unstable.list
+curl -fsSL "https://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/unstable/xUbuntu_${VERSION_ID}/Release.key" \
+  | sudo gpg --dearmor | sudo tee /etc/apt/trusted.gpg.d/devel_kubic_libcontainers_unstable.gpg
+sudo apt update && sudo apt install -y podman
+```
+
+Then install podman-compose:
+
+```bash
+pip install podman-compose
+```
+
+Enable systemd lingering so containers can restart on boot:
+
+```bash
+sudo loginctl enable-linger $USER
+```
+
+#### GPU Support (Nvidia)
+
+Install the NVIDIA Container Toolkit if not already present:
 
 ```bash
 curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | sudo gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg \
@@ -23,18 +49,24 @@ curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | sudo gpg --dear
     sudo tee /etc/apt/sources.list.d/nvidia-container-toolkit.list
 sudo apt-get update
 sudo apt-get install -y nvidia-container-toolkit
+```
 
-# Configure NVIDIA Container Toolkit
-sudo nvidia-ctk runtime configure --runtime=docker
-sudo systemctl restart docker
+Generate the CDI (Container Device Interface) config so Podman can access your GPU:
 
-# Test GPU integration
-docker run --gpus all nvidia/cuda:11.5.2-base-ubuntu20.04 nvidia-smi
+```bash
+sudo mkdir -p /etc/cdi
+sudo nvidia-ctk cdi generate --output=/etc/cdi/nvidia.yaml
+```
+
+Verify CDI config was generated:
+
+```bash
+nvidia-ctk cdi list
 ```
 
 ### Configuration
 
-1. Clone the Docker Compose repository:
+1. Clone the repository:
 
     ```bash
     git clone https://github.com/mythrantic/ollama-docker.git
@@ -48,23 +80,40 @@ docker run --gpus all nvidia/cuda:11.5.2-base-ubuntu20.04 nvidia-smi
 
 ## Usage
 
-Start Ollama and its dependencies using Docker Compose:
+Start Ollama and its dependencies using Podman Compose:
 
-if gpu is configured
+GPU only:
 ```bash
-docker compose -f docker-compose-ollama-gpu.yaml up -d
+podman-compose --profile gpu up -d
 ```
 
-else
+CPU only:
 ```bash
-docker compose up -d
+podman-compose --profile cpu up -d
+```
+
+Both GPU and CPU backends:
+```bash
+podman-compose --profile gpu --profile cpu up -d
+```
+
+UI only (no Ollama backend — connect to an existing one):
+```bash
+podman-compose up -d
 ```
 
 Visit [http://localhost:8080](http://localhost:8080) in your browser to access Ollama-webui.
 
-### Model Installation
+### Pull a model
 
-Navigate to settings -> model and install a model (e.g., llava-phi3). This may take a couple of minutes, but afterward, you can use it just like ChatGPT.
+```bash
+podman exec ollama-gpu ollama pull deepseek-r1:7b
+podman exec ollama-cpu ollama pull codellama:7b
+```
+
+### Model Installation via UI
+
+Navigate to Settings -> Model and install a model (e.g., llava-phi3). This may take a couple of minutes, but afterward, you can use it just like ChatGPT.
 
 ### Explore Langchain and Ollama
 
@@ -72,30 +121,27 @@ You can explore Langchain and Ollama within the project. A third container named
 
 ### Devcontainer and Virtual Environment
 
-The **app** container serves as a devcontainer, allowing you to boot into it for experimentation. Additionally, the run.sh file contains code to set up a virtual environment if you prefer not to use Docker for your development environment.
-if you have vs code and the `Remote Development´ extension simply opening this project from the root will make vscode ask you to reopen in container
+The **app** container serves as a devcontainer, allowing you to boot into it for experimentation. Additionally, the run.sh file contains code to set up a virtual environment if you prefer not to use Podman for your development environment.
+If you have VS Code and the `Remote Development` extension, simply opening this project from the root will make VS Code ask you to reopen in container.
+
 ## Stop and Cleanup
 
-To stop the containers and remove the network:
+Tear down containers (keeps volumes):
 
 ```bash
-docker compose down
+podman-compose --profile gpu --profile cpu down
 ```
 
 ## Contributing
 
-We welcome contributions! If you'd like to contribute to the Ollama Docker Compose Setup, please follow our [Contribution Guidelines](CONTRIBUTING.md).
+We welcome contributions! If you'd like to contribute to the Ollama Podman Compose Setup, please follow our [Contribution Guidelines](CONTRIBUTING.md).
 
 ![Alt](https://repobeats.axiom.co/api/embed/d7581a324f7cb8cfcc18a1465b039157e3d1c8dc.svg "Repobeats analytics image")
 
-
 ## License
 
-This project is licensed under the [RSOSL](https://github.com/mythrantic/ollama-docker/blob/main/LICENCE.md). Feel free to use, modify, and distribute it according to the terms of the license. Just give me a mention and some credit
+This project is licensed under the [RSOSL](https://github.com/mythrantic/ollama-docker/blob/main/LICENCE.md). Feel free to use, modify, and distribute it according to the terms of the license. Just give me a mention and some credit.
 
 ## Contact
 
 If you have any questions or concerns, please contact us at [vantlynxz@gmail.com](mailto:vantlynxz@gmail.com).
-
-Enjoy using Ollama with Docker Compose! 🐳🚀
-
