@@ -54,21 +54,21 @@ services:
   ollama-webui:
     image: ghcr.io/open-webui/open-webui:main
     container_name: ollama-webui
-    pull_policy: always
+    # pull_policy: always
     volumes:
       - ollama-webui-data:/app/backend/data
     ports:
       - 8080:8080
     environment: # https://docs.openwebui.com/getting-started/env-configuration#default_models
-      - OLLAMA_BASE_URLS=http://host.containers.internal:11434;http://host.containers.internal:11435
+      - OLLAMA_BASE_URLS=http://${HOST_IP}:11434;http://${HOST_IP}:11435
       - ENV=dev
       - WEBUI_AUTH=False
       - WEBUI_NAME=valiantlynx AI
       - WEBUI_URL=http://localhost:8080
       - WEBUI_SECRET_KEY=t0p-s3cr3t
-      - NO_PROXY=host.containers.internal
+      - NO_PROXY=${HOST_IP}
     extra_hosts:
-      - host.containers.internal:host-gateway
+      - host.containers.internal:${HOST_IP}
     restart: unless-stopped
     networks:
       - ollama-docker
