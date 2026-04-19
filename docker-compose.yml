@@ -1,5 +1,85 @@
+# Usage:
+#   GPU only:   docker compose --profile gpu up -d
+#   CPU only:   docker compose --profile cpu up -d
+#   Both:       docker compose --profile gpu --profile cpu up -d
+#   UI only:    docker compose up -d
+#
+# Tear down (keeps volumes):
+#   docker compose --profile gpu --profile cpu down
+#
+# Pull a model into a specific backend:
+#   docker exec ollama-gpu ollama pull deepseek-r1:7b
+#   docker exec ollama-cpu ollama pull codellama:7b
+
 services:
+
+  ollama-gpu:
+    profiles: [gpu]
+    image: docker.io/ollama/ollama:latest
+    container_name: ollama-gpu
+    pull_policy: always
+    tty: true
+    restart: unless-stopped
+    ports:
+      - 11434:11434
+    volumes:
+      - ollama-gpu-data:/root/.ollama
+    environment:
+      - OLLAMA_KEEP_ALIVE=24h
+      - OLLAMA_ORIGINS=*
+      - OLLAMA_CONTEXT_LENGTH=32000
+    networks:
+      - ollama-docker
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+  ollama-cpu:
+    profiles: [cpu]
+    image: docker.io/ollama/ollama:latest
+    container_name: ollama-cpu
+    pull_policy: always
+    tty: true
+    restart: unless-stopped
+    ports:
+      - 11435:11434
+    volumes:
+      - ollama-cpu-data:/root/.ollama
+    environment:
+      - OLLAMA_KEEP_ALIVE=24h
+      - OLLAMA_HOST=0.0.0.0
+      - OLLAMA_CONTEXT_LENGTH=32000
+    networks:
+      - ollama-docker
+
+  ollama-webui:
+    image: ghcr.io/open-webui/open-webui:main
+    container_name: ollama-webui
+    pull_policy: always
+    volumes:
+      - ollama-webui-data:/app/backend/data
+    ports:
+      - 8080:8080
+    environment: # https://docs.openwebui.com/getting-started/env-configuration#default_models
+      - OLLAMA_BASE_URLS=http://host.docker.internal:11434;http://host.docker.internal:11435
+      - ENV=dev
+      - WEBUI_AUTH=False
+      - WEBUI_NAME=valiantlynx AI
+      - WEBUI_URL=http://localhost:8080
+      - WEBUI_SECRET_KEY=t0p-s3cr3t
+      - NO_PROXY=host.docker.internal
+    extra_hosts:
+      - host.docker.internal:host-gateway
+    restart: unless-stopped
+    networks:
+      - ollama-docker
+
   app:
+    profiles: [dev]
     build: .
     ports:
       - 8000:8000
@@ -8,53 +88,14 @@ services:
       - .:/code
     command: uvicorn src.main:app --host 0.0.0.0 --port 8000 --reload
     restart: always
-    depends_on:
-      - ollama
-      - ollama-webui
-    networks:
-      - ollama-docker
-
-  ollama:
-    image: docker.io/ollama/ollama:latest
-    ports:
-      - 7869:11434
-    volumes:
-      - .:/code
-      - ./ollama/ollama:/root/.ollama
-    container_name: ollama
-    pull_policy: always
-    tty: true
-    restart: always
-    environment:
-      - OLLAMA_KEEP_ALIVE=24h
-      - OLLAMA_HOST=0.0.0.0
-    networks:
-      - ollama-docker
-
-  ollama-webui:
-    image: ghcr.io/open-webui/open-webui:main
-    container_name: ollama-webui
-    volumes:
-      - ./ollama/ollama-webui:/app/backend/data
-    depends_on:
-      - ollama
-    ports:
-      - 8080:8080
-    environment: # https://docs.openwebui.com/getting-started/env-configuration#default_models
-      - OLLAMA_BASE_URLS=http://host.docker.internal:7869 #comma separated ollama hosts
-      - ENV=dev
-      - WEBUI_AUTH=False
-      - WEBUI_NAME=valiantlynx AI
-      - WEBUI_URL=http://localhost:8080
-      - WEBUI_SECRET_KEY=t0p-s3cr3t
-      - NO_PROXY=host.docker.internal 
-    extra_hosts:
-      - host.docker.internal:host-gateway
-    restart: unless-stopped
     networks:
       - ollama-docker
 
 networks:
   ollama-docker:
     external: false
-  
+
+volumes:
+  ollama-gpu-data:
+  ollama-cpu-data:
+  ollama-webui-data:
