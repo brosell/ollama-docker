@@ -61,7 +61,7 @@ services:
     ports:
       - 8080:8080
     environment: # https://docs.openwebui.com/getting-started/env-configuration#default_models
-      - OLLAMA_BASE_URLS=http://${HOST_IP}:11434;http://${HOST_IP}:11435
+      - OLLAMA_BASE_URLS=http://ollama-gpu:11434;http://ollama-cpu:11434
       - ENV=dev
       - WEBUI_AUTH=False
       - WEBUI_NAME=valiantlynx AI
