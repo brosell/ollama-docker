@@ -74,6 +74,46 @@ services:
     networks:
       - ollama-docker
 
+  openfang:
+    profiles: [openfang]
+    image: ubuntu:latest
+    container_name: openfang
+    tty: true
+    restart: unless-stopped
+    ports:
+      - 4200:4200
+    volumes:
+      - openfang-data:/root/.openfang
+    environment:
+      - OPENFANG_LISTEN=0.0.0.0:4200
+      - DEBIAN_FRONTEND=noninteractive
+      - TZ=Etc/UTC
+    command:
+      - bash
+      - -lc
+      - |
+        set -e
+        apt-get update
+        apt-get install -y tzdata curl vim
+        curl -fsSL https://openfang.sh/install | sh
+        export PATH=/root/.openfang/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+        openfang init --quick
+        cat >/root/.openfang/config.toml <<'EOF'
+        api_key = "p"
+        api_listen = "0.0.0.0:4200"
+
+        [default_model]
+        provider = "ollama"
+        model = "gemma4:e4b"
+        base_url = "http://ollama-gpu:11434/v1"
+
+        [memory]
+        decay_rate = 0.05
+        EOF
+        openfang start
+    networks:
+      - ollama-docker
+
   app:
     profiles: [dev]
     build: .
@@ -95,3 +135,4 @@ volumes:
   ollama-gpu-data:
   ollama-cpu-data:
   ollama-webui-data:
+  openfang-data:
