@@ -1,15 +1,20 @@
 # Usage:
-#   GPU only:   podman-compose --profile gpu up -d
-#   CPU only:   podman-compose --profile cpu up -d
-#   Both:       podman-compose --profile gpu --profile cpu up -d
-#   UI only:    podman-compose up -d
+#   GPU only (nvidia): podman-compose --profile gpu up -d
+#   GPU only (amd):    podman-compose --profile amd up -d
+#   CPU only:          podman-compose --profile cpu up -d
+#   All backends:      podman-compose --profile gpu --profile amd --profile cpu up -d
+#   UI only:           podman-compose up -d
 #
 # Tear down (keeps volumes):
-#   podman-compose --profile gpu --profile cpu down
+#   podman-compose --profile gpu --profile amd --profile cpu down
 #
 # Pull a model into a specific backend:
 #   podman exec ollama-gpu ollama pull deepseek-r1:7b
+#   podman exec ollama-amd ollama pull deepseek-r1:7b
 #   podman exec ollama-cpu ollama pull codellama:7b
+#
+# Note: ollama-amd uses ROCm. HSA_OVERRIDE_GFX_VERSION=11.0.0 is set for
+#       AMD Strix Halo (Radeon 890M / gfx1151) compatibility. Adjust if needed.
 
 services:
 
@@ -33,6 +38,32 @@ services:
     networks:
       - ollama-docker
 
+  ollama-amd:
+    profiles: [amd]
+    image: docker.io/ollama/ollama:rocm
+    container_name: ollama-amd
+    pull_policy: always
+    tty: true
+    restart: unless-stopped
+    ports:
+      - 11436:11434
+    volumes:
+      - ollama-amd-data:/root/.ollama
+    environment:
+      - OLLAMA_KEEP_ALIVE=24h
+      - OLLAMA_ORIGINS=*
+      - OLLAMA_CONTEXT_LENGTH=32000
+      - HSA_OVERRIDE_GFX_VERSION=11.0.0
+      # Allow ROCm to use all system RAM beyond the carved-out VRAM (APU/iGPU unified memory)
+      - HSA_ENABLE_UNIFIED_MEMORY=1
+      # Tell Ollama not to cap VRAM estimation; let it use what ROCm reports
+      - OLLAMA_MAX_VRAM=0
+    devices:
+      - /dev/kfd:/dev/kfd
+      - /dev/dri:/dev/dri
+    networks:
+      - ollama-docker
+
   ollama-cpu:
     profiles: [cpu]
     image: docker.io/ollama/ollama:latest
@@ -48,6 +79,8 @@ services:
       - OLLAMA_KEEP_ALIVE=24h
       - OLLAMA_HOST=0.0.0.0
       - OLLAMA_CONTEXT_LENGTH=32000
+      - OLLAMA_VULKAN=1
+      - OLLAMA_FLASH_ATTENTION=1
     networks:
       - ollama-docker
 
@@ -61,7 +94,7 @@ services:
     ports:
       - 8080:8080
     environment: # https://docs.openwebui.com/getting-started/env-configuration#default_models
-      - OLLAMA_BASE_URLS=http://ollama-gpu:11434;http://ollama-cpu:11434
+      - OLLAMA_BASE_URLS=http://ollama-gpu:11434;http://ollama-amd:11434;http://ollama-cpu:11434
       - ENV=dev
       - WEBUI_AUTH=False
       - WEBUI_NAME=valiantlynx AI
@@ -133,6 +166,7 @@ networks:
 
 volumes:
   ollama-gpu-data:
+  ollama-amd-data:
   ollama-cpu-data:
   ollama-webui-data:
   openfang-data:
