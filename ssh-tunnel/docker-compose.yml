@@ -1,0 +1,41 @@
+version: '3.8'
+
+services:
+  ssh-server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: ssh-tunnel-server
+    ports:
+      - "${SSH_SERVER_PORT:-2222}:2222"
+    volumes:
+      - ssh-server-authorized-keys:/home/tunserver/.ssh/authorized_keys
+      - ssh-server-host-keys:/etc/ssh
+    environment:
+      - SSH_SERVER_PORT=${SSH_SERVER_PORT:-2222}
+    restart: unless-stopped
+    networks:
+      - ssh-tunnel-network
+
+  ssh-client:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+    container_name: ssh-tunnel-client
+    environment:
+      - REMOTE_ADDR=${REMOTE_ADDR}
+      - SERVER_PORT=${SERVER_PORT:-2222}
+      - LOCAL_PORT=${LOCAL_PORT:-8080}
+      - REMOTE_PORT=${REMOTE_PORT:-8080}
+      - SSH_KEY_BASE64=${SSH_KEY_BASE64}
+    restart: unless-stopped
+    networks:
+      - ssh-tunnel-network
+
+networks:
+  ssh-tunnel-network:
+    driver: bridge
+
+volumes:
+  ssh-server-authorized-keys:
+  ssh-server-host-keys:

@@ -1,0 +1,21 @@
+version: '3.8'
+
+services:
+  ssh-client:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+    container_name: ssh-tunnel-client
+    environment:
+      - REMOTE_ADDR=${REMOTE_ADDR}
+      - SERVER_PORT=${SERVER_PORT:-2222}
+      - LOCAL_PORT=${LOCAL_PORT:-8080}
+      - REMOTE_PORT=${REMOTE_PORT:-8080}
+      - SSH_KEY_BASE64=${SSH_KEY_BASE64}
+    restart: unless-stopped
+    networks:
+      - ssh-tunnel-network
+
+networks:
+  ssh-tunnel-network:
+    driver: bridge

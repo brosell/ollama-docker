@@ -1,0 +1,19 @@
+Port 2222
+Protocol 2
+HostKey /etc/ssh/ssh_host_ed25519_key
+LogLevel INFO
+
+PubkeyAuthentication yes
+AuthorizedKeysFile /home/tunserver/.ssh/authorized_keys
+
+PasswordAuthentication no
+PermitEmptyPasswords no
+
+AllowUsers tunserver
+
+X11Forwarding no
+AllowTcpForwarding yes
+AllowAgentForwarding no
+
+ClientAliveInterval 300
+ClientAliveCountMax 2
