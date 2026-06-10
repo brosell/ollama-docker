@@ -40,9 +40,9 @@ services:
 
   ollama-amd:
     profiles: [amd]
-    image: docker.io/ollama/ollama:rocm
+    image: docker.io/ollama/ollama:0.24.0-rocm
     container_name: ollama-amd
-    pull_policy: always
+    pull_policy: missing
     tty: true
     restart: unless-stopped
     ports:
@@ -53,11 +53,9 @@ services:
       - OLLAMA_KEEP_ALIVE=24h
       - OLLAMA_ORIGINS=*
       - OLLAMA_CONTEXT_LENGTH=262144
-      - HSA_OVERRIDE_GFX_VERSION=11.0.0
+      # - HSA_OVERRIDE_GFX_VERSION=11.0.0
       # Allow ROCm to use all system RAM beyond the carved-out VRAM (APU/iGPU unified memory)
       - HSA_ENABLE_UNIFIED_MEMORY=1
-      # Tell Ollama not to cap VRAM estimation; let it use what ROCm reports
-      - OLLAMA_MAX_VRAM=0
     devices:
       - /dev/kfd:/dev/kfd
       - /dev/dri:/dev/dri
