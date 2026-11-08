@@ -18,6 +18,23 @@
 #   silently falls back to CPU. The Vulkan-backed path is the safer default.
 #   Keep the "cpu" profile as the Strix Halo / iGPU path unless you are testing
 #   ROCm-specific fixes.
+#
+# SECURITY (SSH bastion):
+#   The Ollama backends (ollama-gpu/amd/cpu) no longer publish their ports to
+#   the host. They are reachable ONLY over the internal "ollama-docker" network,
+#   and the sole entry point is the "bastion" service (ssh on host port 2222,
+#   key-only). Users forward with:
+#     ssh -L 11434:ollama-gpu:11434 -p 2222 relay@YOUR_HOST_IP
+#   then point their OpenAI client at http://localhost:11434/v1
+#   Manage per-user keys in ./bastion/config/authorized_keys.
+#
+#   LAN access: the Ollama backends are ALSO published on ${HOST_IP} (your LAN
+#   IP), so devices on your local network can reach them directly at
+#   http://HOST_IP:11434/v1 with NO auth. External access goes through the
+#   bastion (key-only). Set HOST_IP in .env (see .env.example / ./gen-env.sh).
+#   The ollama-webui keeps its port 8080 (owner-facing UI, not exposed via the
+#   bastion). Run everything:
+#     podman-compose --profile gpu --profile amd --profile cpu --profile ui --profile bastion up -d
 
 services:
 
@@ -28,8 +45,10 @@ services:
     pull_policy: always
     tty: true
     restart: unless-stopped
+    # LAN-only publish (bound to ${HOST_IP}); NOT on the public interface.
+    # External users reach this backend through the SSH bastion instead.
     ports:
-      - 11434:11434
+      - "${HOST_IP}:11434:11434"
     volumes:
       - ollama-gpu-data:/root/.ollama
     environment:
@@ -51,8 +70,10 @@ services:
     pull_policy: always
     tty: true
     restart: unless-stopped
+    # LAN-only publish (bound to ${HOST_IP}); NOT on the public interface.
+    # External users reach this backend through the SSH bastion instead.
     ports:
-      - 11436:11434
+      - "${HOST_IP}:11436:11434"
     volumes:
       - ollama-amd-data:/root/.ollama
     environment:
@@ -88,8 +109,10 @@ services:
     pull_policy: always
     tty: true
     restart: unless-stopped
+    # LAN-only publish (bound to ${HOST_IP}); NOT on the public interface.
+    # External users reach this backend through the SSH bastion instead.
     ports:
-      - 11435:11434
+      - "${HOST_IP}:11435:11434"
     volumes:
       - ollama-cpu-data:/root/.ollama
       - /dev/dri:/dev/dri
@@ -145,6 +168,38 @@ services:
       - .:/code
     command: uvicorn src.main:app --host 0.0.0.0 --port 8000 --reload
     restart: always
+    networks:
+      - ollama-docker
+
+  # SSH bastion: key-only login, local TCP forwarding to the Ollama backends.
+  # This is the ONLY public entry point. Backends are internal-only.
+  bastion:
+    profiles: [bastion]
+    image: ghcr.io/linuxserver/openssh-server:latest
+    container_name: bastion
+    pull_policy: always
+    restart: unless-stopped
+    ports:
+      - "2222:2222"
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - USER_NAME=relay
+      - PASSWORD_ACCESS=false   # key-only
+      - PUBLIC_KEY_FILE=/config/authorized_keys   # read keys from this mounted file
+      # NOTE: key sync is NOT done by this var alone. The image's init appends
+      # PUBLIC_KEY_FILE into /config/.ssh/authorized_keys with a broken dedupe
+      # guard (removals stay invisible). A custom-init script mounted at
+      # /custom-cont-init.d (auto-run on start by the image) OVERWRITES the
+      # effective file from the source instead. See that script's header.
+      - TZ=UTC
+    volumes:
+      - ./bastion/config:/config   # source of truth for keys (authorized_keys)
+      # custom-init script that overwrites /config/.ssh/authorized_keys from the
+      # source on every start (the image runs executable scripts here on boot).
+      - ./bastion/config/custom-cont-init.d:/custom-cont-init.d
+    cap_add:
+      - NET_BIND_SERVICE
     networks:
       - ollama-docker
 
